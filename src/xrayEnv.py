@@ -22,13 +22,16 @@ class xrayEnv(gym.Env):
     def getInfo(self):
         return {"steps": self.steps, "answer": self.answer}
 
-    def reset(self):
+    def reset(self, return_info=False):
         self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using search[] and finish[]")
         self.steps = 0
         self.answer = None
         observation = self.getObs()
         info = self.getInfo()
-        return observation, info
+        if (return_info):
+            return observation, info
+        else:
+            return observation
 
     def loadPatientData(self, df):
         self.patientData = df
