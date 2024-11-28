@@ -68,7 +68,7 @@ def main():
 
     instruction = """
     Diagnose a patient with either a progressor or a non-progressor utilizing interleaving Thought, Action, and Observation steps. Thought can reason about the current situation, and Action can be two types:
-(1) retrive[entity], which searches the patient data and returns the requested information.
+(1) retrive[entity], which searches the patient data and returns the requested information. Valid entities include V00WOMKP, V00DIL(R)KN14, P01BP30, V00MOSFLP, V00MMTMB, V00MBMSTMC, P01KSX, P01L(R)XRKOA2, V00AMTPD, V0NSAIDS.
 (2) finish[answer], which returns the answer and diagnoses the patient.
     """
 
