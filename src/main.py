@@ -1,14 +1,24 @@
 import os
 from os import path
-import openai
 import pandas as pd
 from xrayEnv import xrayEnv
+from huggingface_hub import login
 
-def llm(prompt, stop=["\n"]):
-    response = openai.Completion.create(model="gpt-3.5-turbo-instruct", prompt=prompt, temperature=0, max_token=100, top_p=1, frequency_penalty=0.0, presence_penalty=0.0, stop=stop)
-    return response["choices"][0]["text"]
+def llm(prompt, pipe, stop=["\n"]):
+    response = pipe(
+            prompt,
+            max_length=10000,
+            do_sample=False,
+            top_p=1,
+            return_full_text=False)
+    output = response[0]["generated_text"]
 
-def think(env, idx, prompt, pat_id):
+    for stop_token in stop:
+        text_output = output.split(stop_token)[0]
+
+    return text_output
+
+def think(env, idx, prompt, pat_id, pipe):
     question = env.reset()
 
     print(idx, question)
@@ -20,7 +30,7 @@ def think(env, idx, prompt, pat_id):
 
     for i in range(1, 8):
         n_calls += 1
-        thought_action = llm(prompt + f"Thought: {i}:", stop=[f"\nObservation {i}:"])
+        thought_action = llm(prompt + f"Thought: {i}:", pipe, stop=[f"\nObservation {i}:"])
 
         try:
             thought, action = thought_action.strip().split("f\nAction{i}")
@@ -29,7 +39,7 @@ def think(env, idx, prompt, pat_id):
             n_badcalls += 1
             n_calls += 1
             thought = thought_action.strip().split('\n')[0]
-            action = llm(prompt + f"Thought {i}: {thought}\nAction {i}:", stop=[f"\n"]).strip()
+            action = llm(prompt + f"Thought {i}: {thought}\nAction {i}:", pipe, stop=[f"\n"]).strip()
 
         obs, done, info = env.step(env, pat_id, action[0].lower() + action[1:])
         obs = obs.replace('\\n', '')
@@ -57,11 +67,15 @@ def prepareEnv(file, env):
     return env, n_rows
 
 def main():
-    openai.api_key = os.environ["OPENAI_API_KEY"]
+    login()
 
-    if openai.api_key is None:
-        print("Error: OpenAI API key not found!")
-        exit()
+    pipe = pipeline(
+            "text-generation",
+            model="meta-llama/Llama-3.2-1B",
+            torch_dtype=torch.bfloat16,
+            device_map="auto")
+
+    pipe("The key to life is")
 
     env = xrayEnv()
     env, n_rows = prepareEnv("data/xray_data.csv", env)
@@ -78,7 +92,7 @@ def main():
     for i in range(0, 10):
         patient = patients.iloc[i]
         pat_id = patient["ID"]
-        info = think(env, i, instruction, pat_id)
+        info = think(env, i, instruction, pat_id, pipe)
 
 if __name__ == "__main__":
     main()
