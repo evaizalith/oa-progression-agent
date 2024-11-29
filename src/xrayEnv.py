@@ -23,7 +23,7 @@ class xrayEnv(gym.Env):
         return {"steps": self.steps, "answer": self.answer}
 
     def reset(self, return_info=False):
-        self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using search[] and finish[]")
+        self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using retrieve[entity] and finish[answer].\n")
         self.steps = 0
         self.answer = None
         observation = self.getObs()
@@ -50,8 +50,11 @@ class xrayEnv(gym.Env):
         if entity == "GROUPTYPE":
             self.obs = f"I'm not allowed to look at column {entity}"
         else:
-            value = patientRow[entity].values[0]
-            self.obs = f"Patient has {value} in column {entity}"
+            try: 
+                value = patientRow[entity].values[0]
+                self.obs = f"Patient has {value} in column {entity}"
+            except:
+                self.obs = f"invalid entity: {entity}"
 
     def step(self, patientID, action):
         done = False
