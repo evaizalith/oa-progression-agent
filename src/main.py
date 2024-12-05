@@ -2,9 +2,10 @@ import torch
 import os
 from os import path
 import pandas as pd
-from xrayEnv import xrayEnv
+from netEnv import xrayNetEnv
 from huggingface_hub import login
 from transformers import pipeline
+from sklearn.model_selection import train_test_split
 
 def llm(prompt, pipe, stop=["\n"]):
     response = pipe(
@@ -51,7 +52,7 @@ def think(env, idx, prompt, pat_id, pipe):
         step_str = f"Thought {i}: {thought}\nAction {i}: {action}\nObservation {i}: {obs}\n"
         prompt += step_str
 
-        print(step_str)
+        #print(step_str)
 
         if done:
             break
@@ -67,10 +68,39 @@ def prepareEnv(file, env):
     if not path.exists(file):
         print("Unable to find data {path}")
         exit()
+    
+    cols = ['ID', 'SIDE', 'V00CFWDTH', 'P01BMI', 'V00AGE', 'P02SEX', 'V00MCMJSW', 'GROUPTYPE']
+    df = pd.read_csv(file, usecols=cols)
 
-    df = pd.read_csv(file)
+    if df is None:
+        print("Error: unable to load file {file} into dataframe")
+        exit()
+
     n_rows = len(df["ID"])
-    env.loadPatientData(df)
+    copy = df.copy(deep=True)
+    env.loadPatientData(copy)
+
+    labels = df['GROUPTYPE']
+    df.drop(['ID', 'GROUPTYPE'], axis=1, inplace=True)
+    
+    df.fillna(0.0)
+    training_data = df
+
+    # Discretize SIDE, PO2SEX
+    training_data['SIDE'] = training_data['SIDE'].apply(lambda x: 0 if x == "1: Right" else 1)
+    training_data['P02SEX'] = training_data['P02SEX'].apply(lambda x: 0 if x == "1: Male" else 1)
+
+    x = pd.DataFrame().reindex_like(training_data)
+    x.iloc[:] = training_data.iloc[:].astype(float)
+
+    # Discretize labels into binary 0 (non-progressor) and 1 (progressor)
+    y = labels.apply(lambda x: '0' if x == "Non Progressor" else '1')
+    y = y.astype(float)
+
+    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
+
+    env.nn.train(10, 30, x_train, y_train)
+
     return env, n_rows
 
 def main():
@@ -84,27 +114,40 @@ def main():
 
     pipe("The key to life is")
 
-    env = xrayEnv()
+    env = xrayNetEnv()
     env, n_rows = prepareEnv("data/xray_data.csv", env)
 
     instruction = """
     Diagnose a patient with either a progressor or a non-progressor utilizing interleaving Thought, Action, and Observation steps. Thought can reason about the current situation, and Action can be two types:
-(1) retrive[entity], which searches the patient data and returns the requested information. Valid values for entity include: SIDE, V00CFWDTH, V00MCMJSW, V00JSW175, V00JSW200, V00JSW250, V00JSW300, V00JSW225, V00TPCFDS, V00BMANG, V00JSW150, V00JSW275, V00LJSW850, V00LJSW900, V00LJSW700, V00LJSW825, V00LJSW750, V00LJSW875, V00LJSW725, V00LJSW775, V00LJSW800, V00XMJSW, V00MJSWBB, V00XRJSM, V00XRKL, V00XRJSL, V00MCMJSW, P01KPMEDCV, P01BMI, V00AGE, P02SEX, P02HISP, P02RACE, V00WOMKP, V00WOMADL, V00BARCDJD, V00INCPLL, V00INCPLM, V00NOMMJSW, V00NOLJSWX, V00IMPIXSZ.
 
-For example, the action "retrieve[SIDE]" will return the target knee; and "retrieve[PO2SEX]" will return the patient's PO2SEX score. Use different entities to access different data points.
+(1) retrieve[patient], which collects patient data
 
-(2) finish[answer], which returns the answer and diagnoses the patient. The action "finish[progressor]" will diagnose a patient as a progressor; while the action "finish[non-progressor]" will diagnose a patient as a non-progressor.
+(2) process[data], which provides the patient data to your internal neural network and allows you to determine whether or not the patient is a progressor or a non-progressor
+
+(3) finish[answer], which returns the answer and diagnoses the patient. The action "finish[progressor]" will diagnose a patient as a progressor; while the action "finish[non-progressor]" will diagnose a patient as a non-progressor.
 
 Here are some examples.
     """
 
-    examples = "Thought 1: I should check the patient's V00WOMKP score.\nAction 1: retrieve[V00WOMPK]\nObservation 1: Patient has 2 in column V00WOMPK.\nThought 2: I should check the patient's V00JSW175 score.\nAction 2: retrieve[V00JSW175]\nObservation 2: Patient has 5.67 in column V00JSW175\n.Thought 3: I should check the patient's V00JSW250.\nAction 3: retrieve[V00JSW250]\nObservation 3: Patient has 5.55 in column V00JSW250.\nThought 4: With all this data, we can possibly diagnose this patient as a progressor.\nAction 4: finish[progressor]\nObservation 4: Episode finished"
-
+    examples = """Thought 1: First, I retrieve patient data.
+    Action 1: retrieve[patient]
+    Observation 1: Patient has SIDE = 0.0, V00CFWDTH = 85.94, P01BMI = 22.9, V00AGE = 77.0, P02SEX = 1.0, and V00MCMJSW = 2.493
+    Thought 2: Next, I will pass this data to the neural network.
+    Action 2: process[0.0, 85.94, 22.9, 77.0, 1.0, 2.493]
+    Observation 2: The likelihood of progressing is 0.7875
+    Thought 3: Because the likelihood of progressing is 0.7875, which is greater than 0.5, I can say that this is a progressor.
+    Action 3: finish[progressor]
+    """
 
     prompt = instruction + examples
 
     infos = []
     patients = env.patientData.sample(n=10)
+
+    env.searchStep(9002817)
+    print(env.obs)
+    env.process("0.0, 85.94, 22.9, 77.0, 1.0, 2.493")
+    print(env.obs)
 
     for i in range(0, 10):
         print("================")
