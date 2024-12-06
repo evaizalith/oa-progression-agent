@@ -29,7 +29,7 @@ class oaClassifier(nn.Module):
 
         return x
 
-    def train(self, n_epochs, batch_size, x_t, y_t):
+    def train(self, n_epochs, batch_size, x_t, y_t, x_v, y_v):
         
         n_batches = len(x_t) // batch_size
 
@@ -38,6 +38,8 @@ class oaClassifier(nn.Module):
             y_train = torch.FloatTensor(y_train.to_numpy())
             y_train = torch.unsqueeze(y_train, 1)
             epoch_loss = 0.0
+            correct = 0.0
+
             for i in range(n_batches):
 
                 x0 = i * batch_size
@@ -59,4 +61,16 @@ class oaClassifier(nn.Module):
 
                 epoch_loss += loss.item()
 
-            print(f"Epoch {epoch} loss = {epoch_loss}")
+            x_test, y_test = shuffle(x_v, y_v)
+            x_test = Variable(torch.FloatTensor(x_test.values[:]))
+            x_test = torch.nan_to_num(x_test, nan=0.0)
+            y_test = torch.FloatTensor(y_test.to_numpy())
+            y_test = torch.unsqueeze(y_test, 1)
+            y_test = torch.nan_to_num(y_test, nan=0.0)
+
+            y_pred = self(x_test)
+            accuracy = (y_pred.round() == y_test).float().mean()
+            accuracy = float(accuracy)
+
+            print(f"Epoch {epoch} loss = {epoch_loss}; accuracy = {accuracy}")
+

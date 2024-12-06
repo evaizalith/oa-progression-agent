@@ -26,7 +26,9 @@ class xrayNetEnv(gym.Env):
         return {"steps": self.steps, "answer": self.answer}
 
     def reset(self, return_info=False):
-        self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using process[entity] and finish[answer].\n")
+        #self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using process[entity] and finish[answer].\n")
+        self.obs = "Question: Predict the OA progression for a patient with SIDE = 1.0, V00CFWDTH = 90.0, P01BMI = 25.0, V00AGE = 50.0, P02SEX = 1.0, and V00MCMJSW = 3.5\n"
+
         self.steps = 0
         self.answer = None
         observation = self.getObs()
