@@ -92,11 +92,12 @@ def prepareEnv(file, env):
     df.fillna(0.0)
     training_data = df
 
+    training_data['V00XRKL'] = training_data['V00XRKL'].apply(lambda x: -1 if x == "1:01" else 0 if x == "2:02" else 1)
 
-    # Discretize SIDE, PO2SEX
-    #training_data['SIDE'] = training_data['SIDE'].apply(lambda x: 0 if x == "1: Right" else 1)
-    #training_data['P02SEX'] = training_data['P02SEX'].apply(lambda x: 0 if x == "1: Male" else 1)
-    training_data['V00XRKL'] = training_data['V00XRKL'].apply(lambda x: 0 if x == "1:01" else 1 if x == "2:02" else 2)
+    for col in training_data.columns:
+        max = training_data[col].max()
+        min = training_data[col].min()
+        training_data[col]= (training_data[col] - min) / (max - min)
         
     x = pd.DataFrame().reindex_like(training_data)
     x.iloc[:] = training_data.iloc[:].astype(float)
