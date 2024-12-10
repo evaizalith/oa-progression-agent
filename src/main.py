@@ -73,7 +73,7 @@ def prepareEnv(file, env):
         print("Unable to find data {path}")
         exit()
     
-    cols = ['ID', 'SIDE', 'V00CFWDTH', 'P01BMI', 'V00AGE', 'P02SEX', 'V00MCMJSW', 'GROUPTYPE']
+    cols = ['ID', 'V00MCMJSW', 'V00XRKL', 'P01BMI', 'V00AGE', 'V00JSW200', 'V00TPCFDS', 'GROUPTYPE']
     df = pd.read_csv(file, usecols=cols)
 
     if df is None:
@@ -84,26 +84,35 @@ def prepareEnv(file, env):
     copy = df.copy(deep=True)
     env.loadPatientData(copy)
 
+    df = df[df.GROUPTYPE != "Pain Only Progressor"]
+
     labels = df['GROUPTYPE']
     df.drop(['ID', 'GROUPTYPE'], axis=1, inplace=True)
     
     df.fillna(0.0)
     training_data = df
 
-    # Discretize SIDE, PO2SEX
-    training_data['SIDE'] = training_data['SIDE'].apply(lambda x: 0 if x == "1: Right" else 1)
-    training_data['P02SEX'] = training_data['P02SEX'].apply(lambda x: 0 if x == "1: Male" else 1)
 
+    # Discretize SIDE, PO2SEX
+    #training_data['SIDE'] = training_data['SIDE'].apply(lambda x: 0 if x == "1: Right" else 1)
+    #training_data['P02SEX'] = training_data['P02SEX'].apply(lambda x: 0 if x == "1: Male" else 1)
+    training_data['V00XRKL'] = training_data['V00XRKL'].apply(lambda x: 0 if x == "1:01" else 1 if x == "2:02" else 2)
+        
     x = pd.DataFrame().reindex_like(training_data)
     x.iloc[:] = training_data.iloc[:].astype(float)
 
     # Discretize labels into binary 0 (non-progressor) and 1 (progressor)
-    y = labels.apply(lambda x: '0' if x == "Non Progressor" else '1')
+    y = labels.apply(lambda x: '0' if (x == "Non Progressor" or x == "Pain Only Progressor") else '1')
     y = y.astype(float)
+    
+    nonprog = len(y.loc[y[:] == 0])
+    prog = len(y) - nonprog
+
+    print(f"{len(y)} total; {nonprog} nonprog; {prog} prog")
 
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
 
-    env.nn.train(10, 30, x_train, y_train, x_val, y_val)
+    env.nn.train(20, 100, x_train, y_train, x_val, y_val)
 
     return env, n_rows
 
