@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim 
 from torch.autograd import Variable
 from sklearn.utils import shuffle
+from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -13,7 +14,7 @@ class oaClassifier(nn.Module):
 
         hidden_size = 5
 
-        self.input_layer = nn.Linear(6, hidden_size)
+        self.input_layer = nn.Linear(7, hidden_size)
         self.hidden_layer = nn.Linear(hidden_size, hidden_size)
         self.hidden_layer2 = nn.Linear(hidden_size, hidden_size)
         self.hidden_layer3 = nn.Linear(hidden_size, hidden_size)
@@ -21,7 +22,7 @@ class oaClassifier(nn.Module):
         self.output_layer = nn.Linear(hidden_size, 1)
 
         self.criterion = nn.BCELoss()
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.1)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.1, patience=5)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,13 +30,13 @@ class oaClassifier(nn.Module):
         x = self.input_layer(x)
         x = F.dropout(x, p=0.1)
         x = F.relu(x)
-        x = self.hidden_layer(x)
-        x = F.relu(x)
-        x = self.hidden_layer2(x)
-        x = F.relu(x)
-        x = self.hidden_layer3(x)
-        x = F.relu(x)
-        x = self.hidden_layer4(x)
+        #x = self.hidden_layer(x)
+        #x = F.relu(x)
+        #x = self.hidden_layer2(x)
+        #x = F.relu(x)
+        # x = self.hidden_layer3(x)
+        #x = F.relu(x)
+        #x = self.hidden_layer4(x)
         x = F.relu(x)
         x = self.output_layer(x)
         x = torch.sigmoid(x)
@@ -54,6 +55,9 @@ class oaClassifier(nn.Module):
             epoch_loss = 0.0
             correct = 0.0
             total = 0.0
+            epoch_pred = torch.FloatTensor()
+            epoch_labels = torch.FloatTensor()
+
 
             for i in range(n_batches):
                 start = i * batch_size
@@ -74,6 +78,9 @@ class oaClassifier(nn.Module):
                 loss.backward()
                 self.optimizer.step()
 
+                epoch_pred = torch.cat((epoch_pred, y_pred))
+                epoch_labels = torch.cat((epoch_labels, y))
+
                 epoch_loss += loss.item()
                 correct += (y_pred.round() == y).sum().item()
                 total += len(y)
@@ -84,6 +91,12 @@ class oaClassifier(nn.Module):
             losses.append(epoch_loss)
             accuracies.append(accuracy)
             print(f"Epoch {epoch} loss = {epoch_loss}; accuracy = {accuracy:.2%} | {correct} / {total}")
+
+            if epoch == (n_epochs - 1):
+                with torch.no_grad():
+                    disp = ConfusionMatrixDisplay.from_predictions(epoch_labels, epoch_pred.round())
+                    disp.plot()
+                    plt.savefig('output/trainingConfusionMatrix.png')
 
         torch.no_grad()
 
@@ -99,14 +112,19 @@ class oaClassifier(nn.Module):
         accuracy = correct / len(y_test)
 
         print(f"Test accuracy = {accuracy} | Total = {len(y_test)} correct")
-        #print(y_test)
-        #print(y_pred)
 
         plt.figure()
         plt.title("Training Results")
         plt.plot(losses, label="Losses", linestyle='--')
         plt.plot(accuracies, label="Accuracy", linestyle='-')
-        plt.xticks(range(0, n_epochs))
+        ticks = list(range(0, n_epochs, 5))
+        ticks.append(n_epochs - 1)
+        plt.xticks(ticks)
         plt.xlabel("Epochs")
         plt.legend()
-        plt.show()
+        plt.savefig('output/modelTrainingAccuracyLoss.png')
+       
+        with torch.no_grad():
+            disp = ConfusionMatrixDisplay.from_predictions(y_test, y_pred.round())
+            disp.plot()
+            plt.savefig('output/testingConfusionMatrix.png')
