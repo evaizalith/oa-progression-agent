@@ -44,6 +44,17 @@ class xrayNetEnv(gym.Env):
         self.patientIDs = df["ID"]
         self.n_rows = len(self.patientIDs)
 
+    def getJSWPred(self, df, id):
+        patient = df.loc[df["ID"] == id]
+        mcmjsw = patient["V00MCMJSW"]
+
+        progressor = False
+
+        if mcmjsw.item() < 4.7:
+            progressor = True
+
+        return progressor
+
     def searchStep(self, patientID):
         patientRow = self.patientData.loc[self.patientData["ID"] == patientID]
 
