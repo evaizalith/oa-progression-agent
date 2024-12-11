@@ -3,6 +3,7 @@ import os
 from os import path
 import pandas as pd
 from netEnv import xrayNetEnv
+from dataHandler import dataHandler
 from huggingface_hub import login
 from transformers import pipeline
 from sklearn.model_selection import train_test_split
@@ -67,62 +68,6 @@ def think(env, idx, prompt, pat_id, pipe):
     info.update({'n_calls': n_calls, 'n_badcalls': n_badcalls, 'traj': prompt})
     return info
 
-# Loads in data file 
-def prepareEnv(file, env):
-    if not path.exists(file):
-        print("Unable to find data {path}")
-        exit()
-    
-    cols = ['ID', 'V00MCMJSW', 'V00XRKL', 'P01BMI', 'V00AGE', 'V00JSW200', 'V00TPCFDS', 'GROUPTYPE']
-    df = pd.read_csv(file, usecols=cols)
-
-    if df is None:
-        print("Error: unable to load file {file} into dataframe")
-        exit()
-
-    n_rows = len(df["ID"])
-    copy = df.copy(deep=True)
-    env.loadPatientData(copy)
-
-    # Balances classes
-    df = df[df.GROUPTYPE != "Pain Only Progressor"]
-    df['GROUPTYPE'] = df['GROUPTYPE'].apply(lambda x: '0' if x == "Non Progressor" else '1')
-    balanced = df.groupby('GROUPTYPE')
-    training_data = pd.DataFrame(balanced.apply(lambda x: x.sample(balanced.size().min()).reset_index(drop=True)))
-
-    labels = training_data['GROUPTYPE']
-    training_data.drop(['ID', 'GROUPTYPE'], axis=1, inplace=True)
-    
-    training_data.fillna(0.0)
-
-    training_data['V00XRKL'] = training_data['V00XRKL'].apply(lambda x: -1 if x == "1:01" else 0 if x == "2:02" else 1)
-
-    # Normalize Data
-    for col in training_data.columns:
-        max = training_data[col].max()
-        min = training_data[col].min()
-        training_data[col]= (training_data[col] - min) / (max - min)
-
-    training_data.fillna(0.0)
-        
-    # Ensures data is all float 
-    x = pd.DataFrame().reindex_like(training_data)
-    x.iloc[:] = training_data.iloc[:].astype(float)
-    y = labels.astype(float)
-    
-    #print(x.head())
-    #print(y)
-
-    nonprog = len(y.loc[y[:] == 0])
-    prog = len(y) - nonprog
-    print(f"{len(y)} total rows of data after clean-up; {nonprog} non-prog; {prog} prog")
-
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
-
-    env.nn.train(10, 64, x_train, y_train, x_val, y_val)
-
-    return env, n_rows
-
 def main():
     """
     login()
@@ -136,7 +81,15 @@ def main():
     pipe("The key to life is")
 """
     env = xrayNetEnv()
-    env, n_rows = prepareEnv("data/xray_data.csv", env)
+    #env, n_rows = prepareEnv("data/xray_data.csv", env)
+    data_handler = dataHandler() 
+    data_handler.setTrain("data/processed_output_Xray.csv")
+    data_handler.setTest("data/clinical_data.csv")
+    x, y = data_handler.preprocess(showData=False)
+
+    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
+
+    env.nn.train(10, 64, x_train, y_train, x_val, y_val)
 
     instruction = """
     Diagnose a patient with either a progressor or a non-progressor utilizing interleaving Thought, Action, and Observation steps. Thought can reason about the current situation, and Action can be two types:
