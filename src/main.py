@@ -84,40 +84,47 @@ def prepareEnv(file, env):
     copy = df.copy(deep=True)
     env.loadPatientData(copy)
 
+    # Balances classes
     df = df[df.GROUPTYPE != "Pain Only Progressor"]
+    df['GROUPTYPE'] = df['GROUPTYPE'].apply(lambda x: '0' if x == "Non Progressor" else '1')
+    balanced = df.groupby('GROUPTYPE')
+    training_data = pd.DataFrame(balanced.apply(lambda x: x.sample(balanced.size().min()).reset_index(drop=True)))
 
-    labels = df['GROUPTYPE']
-    df.drop(['ID', 'GROUPTYPE'], axis=1, inplace=True)
+    labels = training_data['GROUPTYPE']
+    training_data.drop(['ID', 'GROUPTYPE'], axis=1, inplace=True)
     
-    df.fillna(0.0)
-    training_data = df
+    training_data.fillna(0.0)
 
     training_data['V00XRKL'] = training_data['V00XRKL'].apply(lambda x: -1 if x == "1:01" else 0 if x == "2:02" else 1)
 
+    # Normalize Data
     for col in training_data.columns:
         max = training_data[col].max()
         min = training_data[col].min()
         training_data[col]= (training_data[col] - min) / (max - min)
+
+    training_data.fillna(0.0)
         
+    # Ensures data is all float 
     x = pd.DataFrame().reindex_like(training_data)
     x.iloc[:] = training_data.iloc[:].astype(float)
-
-    # Discretize labels into binary 0 (non-progressor) and 1 (progressor)
-    y = labels.apply(lambda x: '0' if (x == "Non Progressor" or x == "Pain Only Progressor") else '1')
-    y = y.astype(float)
+    y = labels.astype(float)
     
+    #print(x.head())
+    #print(y)
+
     nonprog = len(y.loc[y[:] == 0])
     prog = len(y) - nonprog
-
-    print(f"{len(y)} total; {nonprog} nonprog; {prog} prog")
+    print(f"{len(y)} total rows of data after clean-up; {nonprog} non-prog; {prog} prog")
 
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
 
-    env.nn.train(20, 100, x_train, y_train, x_val, y_val)
+    env.nn.train(10, 64, x_train, y_train, x_val, y_val)
 
     return env, n_rows
 
 def main():
+    """
     login()
 
     pipe = pipeline(
@@ -127,7 +134,7 @@ def main():
             device_map="auto")
 
     pipe("The key to life is")
-
+"""
     env = xrayNetEnv()
     env, n_rows = prepareEnv("data/xray_data.csv", env)
 

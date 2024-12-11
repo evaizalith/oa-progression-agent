@@ -11,23 +11,21 @@ class oaClassifier(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # We make use of input data with 47 features (53 after transformation)
-        # Our output is a the probability of progressor or non-progressor
-        self.input_layer = nn.Linear(6, 5)
-        self.hidden_layer = nn.Linear(5, 5)
-        self.hidden_layer2 = nn.Linear(5, 5)
-        self.hidden_layer3 = nn.Linear(5, 5)
-        self.hidden_layer4 = nn.Linear(5, 5)
-        self.output_layer = nn.Linear(5, 1)
+        hidden_size = 5
+
+        self.input_layer = nn.Linear(6, hidden_size)
+        self.hidden_layer = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer2 = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer3 = nn.Linear(hidden_size, hidden_size)
+        self.hidden_layer4 = nn.Linear(hidden_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size, 1)
 
         self.criterion = nn.BCELoss()
-        self.optimizer = optim.Adam(self.parameters(), lr=0.5)
-        self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.5)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.1, patience=5)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x):
-        x -= x.min(1, keepdim=True)[0]
-        x /= x.max(1, keepdim=True)[0]
-
         x = self.input_layer(x)
         x = F.dropout(x, p=0.1)
         x = F.relu(x)
@@ -53,8 +51,6 @@ class oaClassifier(nn.Module):
 
         for epoch in range(n_epochs):
             x_train, y_train = shuffle(x_t, y_t)
-            y_train = torch.FloatTensor(y_train.to_numpy())
-            y_train = torch.unsqueeze(y_train, 1)
             epoch_loss = 0.0
             correct = 0.0
             total = 0.0
@@ -65,8 +61,9 @@ class oaClassifier(nn.Module):
 
                 x = Variable(torch.FloatTensor(x_train.values[start:end]))
                 x = torch.nan_to_num(x, nan=0.0)
-                y = y_train[start:end, :]
+                y = Variable(torch.FloatTensor(y_train.values[start:end]))
                 y = torch.nan_to_num(y, nan=0.0)
+                y = y.unsqueeze(1)
 
                 self.optimizer.zero_grad()
                 
@@ -81,13 +78,12 @@ class oaClassifier(nn.Module):
                 correct += (y_pred.round() == y).sum().item()
                 total += len(y)
 
-            self.scheduler.step()
+            self.scheduler.step(epoch_loss)
 
             accuracy = correct / total
             losses.append(epoch_loss)
             accuracies.append(accuracy)
             print(f"Epoch {epoch} loss = {epoch_loss}; accuracy = {accuracy:.2%} | {correct} / {total}")
-
 
         torch.no_grad()
 
@@ -99,28 +95,17 @@ class oaClassifier(nn.Module):
         y_test = torch.nan_to_num(y_test, nan=0.0)
 
         y_pred = self(x_test)
-        #correct = (y_pred.round() == y_test[0]).sum().item()
-        #total = len(y_test)
+        correct = (y_pred.round() == y_test).sum().item()
+        accuracy = correct / len(y_test)
 
-        _, y_pred_tags = torch.max(y_pred, dim = 1)  
-
-        _, y_test_tag= torch.max(y_test, dim = 1)
-
-        correct_pred = (y_pred_tags == y_test_tag).float()
-
-        acc = correct_pred.sum() / len(correct_pred)
-
-        accuracy = torch.round(acc * 100)
-
-        #accuracy = correct / total
-        #print(f"Testing accuracy: {accuracy:.2%} | {correct} / {total}")
-        print(f"Test accuracy = {accuracy}")
+        print(f"Test accuracy = {accuracy} | Total = {len(y_test)} correct")
+        #print(y_test)
+        #print(y_pred)
 
         plt.figure()
         plt.title("Training Results")
         plt.plot(losses, label="Losses", linestyle='--')
         plt.plot(accuracies, label="Accuracy", linestyle='-')
-        #plt.yticks(np.arange(0, max(losses)) + 1, 0.1)
         plt.xticks(range(0, n_epochs))
         plt.xlabel("Epochs")
         plt.legend()
