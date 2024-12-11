@@ -83,13 +83,18 @@ def main():
     env = xrayNetEnv()
     #env, n_rows = prepareEnv("data/xray_data.csv", env)
     data_handler = dataHandler() 
-    data_handler.setTrain("data/processed_output_Xray.csv")
+    data_handler.setTrain("data/Clinical_FNIH.csv")
     data_handler.setTest("data/clinical_data.csv")
     x, y = data_handler.preprocess(showData=False)
 
     x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.1)
 
-    env.nn.train(10, 64, x_train, y_train, x_val, y_val)
+    env.nn.train(50, 64, x_train, y_train, x_val, y_val)
+
+    data_handler.setXray("data/xray_data.csv")
+    xray = data_handler.getJSW()
+    v = env.getJSWPred(xray, 9001695)
+    print(f"Pred is {v}")
 
     instruction = """
     Diagnose a patient with either a progressor or a non-progressor utilizing interleaving Thought, Action, and Observation steps. Thought can reason about the current situation, and Action can be two types:
