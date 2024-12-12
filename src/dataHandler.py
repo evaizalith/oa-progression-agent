@@ -5,8 +5,9 @@ from os import path
 class dataHandler():
     def __init__(self):
         self.train_set = "trainingData"
+        self.xray_set = "xraySet"
         self.test_set = "testData"
-        self.cols = ['ID', 'V00MCMJSW', 'V00XRKL', 'P01BMI', 'V00AGE', 'V00JSW200', 'V00TPCFDS', 'GROUPTYPE']
+        self.cols = ['ID', 'V00MCMJSW', 'V01MCMJSW', 'V03MCMJSW', 'V05MCMJSW', 'V00XRKL', 'P01BMI', 'V00AGE', 'GROUPTYPE']
         self.colMax = {}
         self.colMin = {}
 
@@ -24,6 +25,14 @@ class dataHandler():
             return False
         
         self.test_set = file
+        return True
+
+    def setXray(self, file):
+        if not path.exists(file):
+            print("Error: unable to find path to xray data")
+            return False
+
+        self.xray_set = file
         return True
 
     def preprocess(self, balanceClasses=True, showData=False):
@@ -70,7 +79,7 @@ class dataHandler():
 
         return training_data, labels
 
-    def getProgFromJSW(self):
-        data = df.read_csv(self.train_set, cols=['ID', 'V00MCMJSW'])
-        progressor = df[df.V00MCMJSW < 4.7]
-        return progressor 
+    def getJSW(self):
+        data = pd.read_csv(self.xray_set, usecols=['ID', 'V00MCMJSW'])
+
+        return data
