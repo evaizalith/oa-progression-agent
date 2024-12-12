@@ -83,3 +83,12 @@ class dataHandler():
         data = pd.read_csv(self.xray_set, usecols=['ID', 'V00MCMJSW'])
 
         return data
+
+    def normalize(self, data):
+        data = [float(i) for i in data]
+        result = []
+        i = 0
+        for col in self.colMax:
+            result.append((data[0] - self.colMin[col]) / (self.colMax[col] - self.colMin[col]))
+            i += 1
+        return result

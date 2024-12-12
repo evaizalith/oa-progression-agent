@@ -18,6 +18,7 @@ class xrayNetEnv(gym.Env):
         self.observation_space = self.action_space = None
         self.n_rows = 0
         self.nn = oaClassifier()
+        self.data_handler = None
 
     def getObs(self):
         return self.obs
@@ -27,7 +28,7 @@ class xrayNetEnv(gym.Env):
 
     def reset(self, return_info=False):
         #self.obs = ("Diagnose a patient's knee osteoarthritis as either progressor or non-progressor using process[entity] and finish[answer].\n")
-        self.obs = "Question: Predict the OA progression for a patient with SIDE = 1.0, V00CFWDTH = 90.0, P01BMI = 25.0, V00AGE = 50.0, P02SEX = 1.0, and V00MCMJSW = 3.5\n"
+        self.obs = "Predict the OA progression for a patient with V00MCMJSW = 5.397, V01MCMJSW = 5.909, V03MCMJSW = 5.156, V05MCMJSW = 5.156, V00XRKL = 2:02, P01BMI = 29.2, V00AGE = 72.0"
 
         self.steps = 0
         self.answer = None
@@ -82,8 +83,14 @@ class xrayNetEnv(gym.Env):
 
     def process(self, entity):
         string_val = entity.split(",")
-        values = [float(n) for n in string_val]
-        x = self.nn.forward(torch.as_tensor(values))
+
+        string_val = [item.replace('1:01', '-1') for item in string_val]
+        string_val = [item.replace('2:02', '0') for item in string_val]
+        string_val = [item.replace('3:03', '1') for item in string_val]
+
+
+        values = self.data_handler.normalize(string_val)
+        x = self.nn.forward(torch.as_tensor(values, dtype=torch.float32))
        
         result = x.item()
 

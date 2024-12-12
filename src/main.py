@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 def llm(prompt, pipe, stop=["\n"]):
     response = pipe(
             prompt,
-            max_new_tokens=100,
+            max_new_tokens=200,
             truncation=True,
             do_sample=True,
             top_p=1,
@@ -43,7 +43,7 @@ def think(env, idx, prompt, pat_id, pipe):
         try:
             thought, action = thought_action.strip().split("f\nAction{i}")
         except:
-            #print(f"Thought {i}: ", thought_action)
+            print(f"Thought {i}: ", thought_action)
             n_badcalls += 1
             n_calls += 1
             thought = thought_action.strip().split('\n')[0]
@@ -69,7 +69,6 @@ def think(env, idx, prompt, pat_id, pipe):
     return info
 
 def main():
-    """
     login()
 
     pipe = pipeline(
@@ -79,9 +78,8 @@ def main():
             device_map="auto")
 
     pipe("The key to life is")
-"""
+
     env = xrayNetEnv()
-    #env, n_rows = prepareEnv("data/xray_data.csv", env)
     data_handler = dataHandler() 
     data_handler.setTrain("data/Clinical_FNIH.csv")
     data_handler.setTest("data/clinical_data.csv")
@@ -93,8 +91,11 @@ def main():
 
     data_handler.setXray("data/xray_data.csv")
     xray = data_handler.getJSW()
-    v = env.getJSWPred(xray, 9001695)
-    print(f"Pred is {v}")
+
+    env.patientData = pd.read_csv("data/Clinical_FNIH.csv")
+    env.data_handler = data_handler
+
+    print(env.process("5.397, 5.909, 5.156, 5.156, 2:02, 29.2, 72.0"))
 
     instruction = """
     Diagnose a patient with either a progressor or a non-progressor utilizing interleaving Thought, Action, and Observation steps. Thought can reason about the current situation, and Action can be two types:
@@ -108,40 +109,31 @@ def main():
 Here are some examples.
     """
 
-    #examples = """Thought 1: First, I retrieve patient data.
-    #Action 1: retrieve[patient]
-    #Observation 1: Patient has SIDE = 0.0, V00CFWDTH = 85.94, P01BMI = 22.9, V00AGE = 77.0, P02SEX = 1.0, and V00MCMJSW = 2.493
-    #Thought 2: Next, I will pass this data to the neural network.
-    #Action 2: process[0.0, 85.94, 22.9, 77.0, 1.0, 2.493]
-    #Observation 2: The likelihood of progressing is 0.7875
-    #Thought 3: Because the likelihood of progressing is 0.7875, which is greater than 0.5, I can say that this is a progressor.
-    #Action 3: finish[progressor]
-    #"""
+    examples = "Question: Predict the OA progression for a patient with V00MCMJSW = 4.488, V01MCMJSW = 3.9, V03MCMJSW = 3.9, V05MCMJSW = 0.0, V00XRKL = 2:02, P01BMI = 28.6, V00AGE = 52\nThought 1: The patient's V00MCMJSW is above 4.7, which would indicate that this patient's condition will not progress. I should double check using my neural network. Thought 2: I will store this data as the vector [4.488, 3.9, 3.9, 0.0, 2:02, 28.6, 52.0] and submit it to my neural network.\nAction 1: process[4.488, 3.9, 3.9, 0.0, 2:02, 28.6, 52.0]\nObservation 1: The likelihood of progression is 0.83\nThought 2: The likelihood of progression is greater than 0.5, therefore the patient's condition is likely to progress.\nAction 2: finish[progressor]Question: Predict the OA progression for a patient with V00MCMJSW = 2.886, V01MCMJSW = 1.781, V03MCMJSW = 1.649, V05MCMJSW = 1.3, V00XRKL = 3:03, P01BMI = 36.5, V00AGE = 61\nThought 1: The patient's V00MCMJSW is below 4.7, which would indicate that this patient's condition will likely progress. I should double check using my neural network. Thought 2: I will store this data as the vector [2.886, 1.781, 1.649, 1.3, 3:03, 36.5, 61.0] and submit it to my neural network.\nAction 1: process[2.886, 1.781, 1.649, 1.3, 3:03, 36.5, 61.0]\nObservation 1: The likelihood of progression is 0.94\nThought 2: The likelihood of progression is greater than 0.5, therefore the patient's condition is likely to progress.\nAction 2: finish[progressor]\nQuestion: Predict the OA progression for a patient with V00MCMJSW = 5.141, V01MCMJSW = 4.868, V03MCMJSW = 4.681, V05MCMJSW = 4.783, V00XRKL = 2:02, P01BMI = 36.0, V00AGE = 64\nThought 1: The patient's V00MCMJSW is above 4.7, which would indicate that this patient's condition will not progress. I should double check using my neural network. Thought 2: I will store this data as the vector [5.141, 4.868, 4.681, 4.783, 2:02, 36.0, 64.0] and submit it to my neural network.\nAction 1: process[5.141, 4.868, 4.681, 4.783, 2:02, 36.0, 64.0]\nObservation 1: The likelihood of progression is 0.32\nThought 2: The likelihood of progression is less than 0.5, therefore the patient's condition is unlikely to progress.\nAction 2: finish[non-progressor]"
 
-    examples = "Question: Predict the OA progression for a patient with SIDE = 0.0, V00CFWDTH = 85.94, P01BMI = 22.9, V00AGE = 77.0, P02SEX = 1.0, and V00MCMJSW = 2.493\nThought 1: I will store this data as the vector [0.0, 85.94, 22.9, 77.0, 1.0, 2.493] and submit it to my neural network.\nAction 1: process[0.0, 85.94, 22.9, 77.0, 1.0, 2.493]\nObservation 1: The likelihood of progression is 0.83\nThought 2: The likelihood of progression is greater than 0.5, therefore the patient's condition is likely to progress.\nAction 2: finish[progressor]\nQuestion: Predict the OA progression for a patient with SIDE = 1.0, V00CFWDTH = 83.48, P01BMI = 22.4, P02SEX = 0.0, and V00MCMJSW = 3.9.\nThought 1: I will store this data as the vector [1.0, 83.48, 22.4, 0.0, 3.9] and submit it to my neural network.\nAction 1: process[1.0, 83.48, 22.4, 0.0, 3.9]\nObservation 1: The likelihood of progression is 0.27\nThought 2: The likelihood of progression is less than 0.5, therefore the patient's condition is unlikely to progress.\nAction 2: finish[non-progressor]"
-
-    question = "Predict the OA progression for a patient with SIDE = 1.0, V00CFWDTH = 90.0, P01BMI = 25.0, V00AGE = 50.0, P02SEX = 1.0, and V00MCMJSW = 3.5"
+    question = "Predict the OA progression for a patient with V00MCMJSW = 5.397, V01MCMJSW = 5.909, V03MCMJSW = 5.156, V05MCMJSW = 5.156, V00XRKL = 2:02, P01BMI = 29.2, V00AGE = 72.0"
 
     prompt = instruction + examples #+ question
 
     infos = []
-    patients = env.patientData.sample(n=10)
 
-    env.searchStep(9002817)
-    print(env.obs)
-    env.process("0.0, 85.94, 22.9, 77.0, 1.0, 2.493")
-    print(env.obs)
+    #env.searchStep(9002817)
+    #print(env.obs)
+    #env.process("0.0, 85.94, 22.9, 77.0, 1.0, 2.493")
+    #print(env.obs)
 
-    for i in range(0, 1):
-        print("================")
-        print(f"Generation {i}")
-        patient = patients.iloc[i]
-        pat_id = patient["ID"]
-        info = think(env, i, prompt, pat_id, pipe)
-        infos.append(info)
-        print(info)
+    think(env, 1, prompt, 0, pipe)
 
-    print(infos)
+    #for i in range(0, 1):
+    #    print("================")
+    #    print(f"Generation {i}")
+    #    patient = patients.iloc[i]
+    #    pat_id = patient["ID"]
+    #    info = think(env, i, prompt, pat_id, pipe)
+    #    infos.append(info)
+    #    print(info)
+
+    #print(infos)
 
 if __name__ == "__main__":
     main()
