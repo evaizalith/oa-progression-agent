@@ -1,36 +1,40 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim 
-
-class imageDataset():
-    def load(filepath):
-
-    def normalize():
+import torch.optim as optim
+import torchvision.transforms as T
+from torch.autograd import Variable
+from sklearn.utils import shuffle
+from sklearn.metrics import ConfusionMatrixDisplay, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import numpy as np
 
 class imageNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d
-        self.conv2 = nn.Conv2d
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear
-        self.fc2 = nn.Linear
-        self.fc3 = nn.Linear
+        self.fc1 = nn.Linear(16 * 32 * 32, 1)
+        #self.fc2 = nn.Linear(50, 30)
+        #self.fc3 = nn.Linear(50, 1)
         
     def forward(self, x):
+        if torch.rand(1) < 0.5:
+            x = torch.flip(x, dims=[2, 3])
+
         x = self.conv1(x)
         x = F.relu(x)
         x = self.pool(x)
-        x = torch.flatten(x, 1)
         x = self.conv2(x)
         x = F.relu(x)
         x = self.pool(x)
+        x = torch.flatten(x, 1)
         x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
+        #x = F.relu(x)
+        #x = self.fc2(x)
+        #x = F.relu(x)
+        #x = self.fc3(x)
         x = torch.sigmoid(x)
 
         return x
@@ -38,30 +42,37 @@ class imageNet(nn.Module):
 class xrayImageClassifier():
     def __init__(self):
         self.net = imageNet()
-        self.optim = optim.SGD(self.net.parameters(), lr=0.01)
-        self.criterion == nn.CrossEntropyLoss()
+        self.optimizer = optim.Adam(self.net.parameters(), lr=0.01)
+        self.criterion = nn.BCELoss()
 
     def train(self, n_epochs, batch_size, x_t, y_t, x_v, y_v):
 
-        n_batches = len(x_t) // batch_size
+        #n_batches = len(x_t) // batch_size
+        n_batches = 200 // batch_size
 
         losses = []
         accuracies = []
 
-        for epoch in range(n_epochs)
+        for epoch in range(n_epochs):
             correct = 0.0
             total = 0.0
+            epoch_loss = 0.0
             epoch_pred = torch.FloatTensor()
-            epoch_labels = torch.FloatTensor():
+            epoch_labels = torch.FloatTensor()
+            y_t = Variable(torch.FloatTensor(y_t))
+            y_t.unsqueeze(1)
             x_train, y_train = shuffle(x_t, y_t)
 
             for i in range(n_batches):
                 start = i * batch_size
                 end = start + batch_size
 
+                x = x_train[start:end]
+                y = y_train[start:end].unsqueeze(1)
+
                 self.optimizer.zero_grad()
                 
-                y_pred = self(x)
+                y_pred = self.net(x)
 
                 loss = self.criterion(y_pred, y)
 
@@ -74,8 +85,6 @@ class xrayImageClassifier():
                 epoch_loss += loss.item()
                 correct += (y_pred.round() == y).sum().item()
                 total += len(y)
-
-            self.scheduler.step(epoch_loss)
 
             accuracy = correct / total
             losses.append(epoch_loss)
@@ -103,17 +112,15 @@ class xrayImageClassifier():
         torch.no_grad()
 
         x_test, y_test = shuffle(x_v, y_v)
-        x_test = Variable(torch.FloatTensor(x_test.values[:]))
-        x_test = torch.nan_to_num(x_test, nan=0.0)
-        y_test = torch.FloatTensor(y_test.to_numpy())
-        y_test = torch.unsqueeze(y_test, 1)
-        y_test = torch.nan_to_num(y_test, nan=0.0)
+        y_test = Variable(torch.FloatTensor(y_test))
 
-        y_pred = self(x_test)
-        correct = (y_pred.round() == y_test).sum().item()
-        accuracy = correct / len(y_test)
+        y_pred = self.net(x_test)
+        correct = (y_pred.round() == y_test)
+        print(correct)
+        print(len(y_v))
+        accuracy = correct / len(y_v)
 
-        print(f"Test accuracy = {accuracy} | Total = {len(y_test)} correct")
+        print(f"Test accuracy = {accuracy} | Total = {len(y_v)}")
 
         plt.figure()
         plt.title("Training Results")
