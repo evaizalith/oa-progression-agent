@@ -104,8 +104,8 @@ class dataHandler():
 
         df = pd.read_csv(self.train_set, usecols=['ID', 'GROUPTYPE'])
 
-        balanced = df.groupby('GROUPTYPE')
-        df = pd.DataFrame(balanced.apply(lambda x: x.sample(balanced.size().min()).reset_index(drop=True)))
+        #balanced = df.groupby('GROUPTYPE')
+        #df = pd.DataFrame(balanced.apply(lambda x: x.sample(balanced.size().min()).reset_index(drop=True)))
 
         df['GROUPTYPE'] = df['GROUPTYPE'].apply(lambda x: 0.0 if x == "Non Progressor" else 1.0)
         id_list = df['ID'].astype(str).to_dict()
@@ -129,6 +129,9 @@ class dataHandler():
 
         print(f"Normalized {len(resized_images)} x-ray images")
 
+        n = len(df[df['GROUPTYPE'] == 0.0])
+        print(n)
+
         df = df[~df['ID'].isin(condensed_id)]
 
         labels = dict(zip(df['ID'], df['GROUPTYPE']))
@@ -141,6 +144,9 @@ class dataHandler():
 
         x = list(images.values())
         y = list(labels.values())
+
+        n = y.count(0.0)
+        print(f"total: {len(y)}; n = {n}")
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size = 0.1)
 

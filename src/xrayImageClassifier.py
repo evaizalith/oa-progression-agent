@@ -42,13 +42,19 @@ class imageNet(nn.Module):
 class xrayImageClassifier():
     def __init__(self):
         self.net = imageNet()
-        self.optimizer = optim.Adam(self.net.parameters(), lr=0.01)
-        self.criterion = nn.BCELoss()
+        self.optimizer = optim.Adam(self.net.parameters(), lr=0.001)
+
+        # Because the image dataset is imbalanced we need to apply manual weights to the classifier
+        # The initial dataset contains progressors : non-progressors in a ratio of approximately 3 : 1
+        # Weights are set accordingly. Modify this if using a more balanced dataset
+        weights = [0.33]
+
+        self.criterion = nn.BCELoss(weight=torch.FloatTensor(weights))
 
     def train(self, n_epochs, batch_size, x_t, y_t, x_v, y_v):
 
         #n_batches = len(x_t) // batch_size
-        n_batches = 200 // batch_size
+        n_batches = 300 // batch_size
 
         losses = []
         accuracies = []
@@ -120,7 +126,7 @@ class xrayImageClassifier():
         print(len(y_v))
         accuracy = correct / len(y_v)
 
-        print(f"Test accuracy = {accuracy} | Total = {len(y_v)}")
+        #print(f"Test accuracy = {accuracy} | Total = {len(y_v)}")
 
         plt.figure()
         plt.title("Training Results")
